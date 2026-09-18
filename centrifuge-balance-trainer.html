@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rotor Balance Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#12161b; --panel:#1a2028; --panel-alt:#212a34; --border:#2a323c;
+  --text:#e6eaee; --dim:#8996a3;
+  --ok:#4fd1a5; --warn:#e2725b; --water:#6fa8c9; --amber:#d9a441;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#eef1f4; --panel:#ffffff; --panel-alt:#e6eaee; --border:#c7cfd6;
+    --text:#161b20; --dim:#5a6672;
+  }
+}
+:root[data-theme="dark"]{ --bg:#12161b; --panel:#1a2028; }
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 20px 60px;}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:20px;}
+h1{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:1.4rem;margin:0;letter-spacing:0.3px;}
+.sub{color:var(--dim);font-size:0.85rem;margin-top:4px;}
+.tabs{display:flex;gap:6px;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:3px;}
+.tab{padding:7px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem;color:var(--dim);user-select:none;}
+.tab.active{background:var(--panel);color:var(--text);font-weight:600;}
+main{display:grid;grid-template-columns:1fr 320px;gap:24px;}
+@media (max-width:820px){main{grid-template-columns:1fr;}}
+.rotor-panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column;align-items:center;}
+svg{width:100%;max-width:420px;height:auto;}
+.slot{fill:var(--panel-alt);stroke:var(--border);stroke-width:2;cursor:pointer;transition:fill .12s,stroke .12s;}
+.slot:hover{stroke:var(--dim);}
+.slot-label{font-family:'IBM Plex Mono',monospace;font-size:9px;fill:var(--dim);pointer-events:none;}
+.tube-mass{font-family:'IBM Plex Mono',monospace;font-size:10px;fill:var(--bg);font-weight:600;pointer-events:none;text-anchor:middle;}
+.readout{margin-top:18px;width:100%;background:var(--panel-alt);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-family:'IBM Plex Mono',monospace;}
+.readout-row{display:flex;justify-content:space-between;font-size:0.82rem;padding:3px 0;color:var(--dim);}
+.readout-row b{color:var(--text);font-weight:600;}
+.status{font-size:1rem;font-weight:700;margin-top:6px;letter-spacing:0.3px;}
+.status.balanced{color:var(--ok);}
+.status.unbalanced{color:var(--warn);}
+.side{display:flex;flex-direction:column;gap:16px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;}
+.card h2{font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--dim);margin:0 0 10px;font-weight:600;}
+.toggle-row{display:flex;gap:6px;}
+.toggle-btn{flex:1;padding:8px;border-radius:7px;border:1px solid var(--border);background:var(--panel-alt);color:var(--dim);cursor:pointer;font-size:0.82rem;font-family:inherit;}
+.toggle-btn.active{background:var(--amber);color:#1a1200;border-color:var(--amber);font-weight:600;}
+.tray{display:flex;flex-wrap:wrap;gap:7px;min-height:40px;}
+.chip{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;cursor:pointer;border:2px solid transparent;color:var(--bg);}
+.chip.water{background:var(--water);}
+.chip.tube{background:#d9dee3;}
+.chip.selected{border-color:var(--amber);transform:scale(1.08);}
+.empty-note{color:var(--dim);font-size:0.8rem;font-style:italic;}
+button.action{width:100%;padding:11px;border-radius:8px;border:none;font-family:inherit;font-weight:600;font-size:0.88rem;cursor:pointer;margin-top:4px;}
+.btn-water{background:var(--water);color:#08222f;}
+.btn-check{background:var(--ok);color:#062b1f;}
+.btn-reset{background:var(--panel-alt);color:var(--dim);border:1px solid var(--border);}
+.btn-challenge{background:var(--amber);color:#1a1200;}
+.btn-next{background:var(--ok);color:#062b1f;}
+.msg{font-size:0.82rem;margin-top:8px;min-height:18px;color:var(--dim);}
+.msg.err{color:var(--warn);}
+.msg.ok{color:var(--ok);}
+.round-info{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;color:var(--dim);}
+.round-info b{color:var(--text);}
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>ROTOR BALANCE TRAINER</h1>
+    <div class="sub">24-slot centrifuge · symmetric loading practice</div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-mode="sandbox">Sandbox</div>
+    <div class="tab" data-mode="challenge">Challenge</div>
+    <div class="tab" data-mode="speed">Speed Drill</div>
+  </div>
+</header>
+
+<main>
+  <div class="rotor-panel">
+    <svg id="rotor" viewBox="0 0 440 440"></svg>
+    <div class="readout">
+      <div class="readout-row"><span>Slots filled</span><b id="rFilled">0 / 24</b></div>
+      <div class="readout-row"><span>Net imbalance vector</span><b id="rVec">0.00 g</b></div>
+      <div class="readout-row"><span>Imbalance angle</span><b id="rAngle">—</b></div>
+      <div class="status unbalanced" id="rStatus">EMPTY ROTOR</div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="card" id="sandboxModeCard">
+      <h2>Tube mass mode</h2>
+      <div class="toggle-row">
+        <button class="toggle-btn active" data-massmode="strict">Strict (identical)</button>
+        <button class="toggle-btn" data-massmode="weighted">Weighted (random)</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="challengeCard">
+      <h2>Challenge round</h2>
+      <div class="round-info"><span>Round</span><b id="cRound">—</b></div>
+      <div class="round-info"><span>Tube mode</span><b id="cTubeMode">Strict</b></div>
+      <button class="action btn-challenge" id="btnNewRound">Start round</button>
+      <button class="action btn-next hidden" id="btnNextRound">Next round →</button>
+      <div class="msg" id="cMsg"></div>
+    </div>
+
+    <div class="card hidden" id="speedCard">
+      <h2>Speed drill · identical tubes only</h2>
+      <div class="round-info"><span>Round</span><b id="sRound">—</b></div>
+      <div class="round-info"><span>Best time</span><b id="sBest">—</b></div>
+      <div class="status" id="sTimer" style="margin-top:6px;">00:00.0</div>
+      <button class="action btn-challenge" id="btnNewSpeed">Start round</button>
+      <button class="action btn-next hidden" id="btnNextSpeed">Next round →</button>
+      <div class="msg" id="sMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Tube tray <span id="traySelHint" style="text-transform:none;color:var(--dim);font-weight:400;"></span></h2>
+      <div class="tray" id="tray"></div>
+      <button class="action btn-water" id="btnWater">+ Add water tube</button>
+    </div>
+
+    <div class="card">
+      <button class="action btn-check" id="btnCheck">Check balance</button>
+      <button class="action btn-reset" id="btnReset">Clear rotor</button>
+      <div class="msg" id="checkMsg"></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+const N_SLOTS = 24, R = 170, CX = 220, CY = 220, SLOT_R = 15, STD_MASS = 10;
+let slots = Array(N_SLOTS).fill(null); // {mass, type}
+let tray = []; // {id, mass, type}
+let selectedTrayId = null;
+let mode = 'sandbox'; // sandbox | challenge
+let massMode = 'strict'; // strict | weighted (sandbox only)
+let challenge = {round: 0, active: false, passed: false, spec: null};
+let speed = {round: 0, active: false, passed: false, spec: null, startTs: null, elapsedMs: 0, timerHandle: null, best: null};
+try{ const b = localStorage.getItem('rotor-speed-best'); if(b) speed.best = parseFloat(b); }catch(e){}
+let idCounter = 1;
+
+function rnd(min,max){return Math.round(min + Math.random()*(max-min));}
+
+function slotPos(i){
+  const angle = (Math.PI*2*i/N_SLOTS) - Math.PI/2;
+  return {x: CX + R*Math.cos(angle), y: CY + R*Math.sin(angle), angle};
+}
+
+function initTray(){
+  tray = [];
+  if(mode==='sandbox'){
+    const count = 12;
+    for(let k=0;k<count;k++){
+      tray.push({id:idCounter++, type:'tube', mass: massMode==='strict'?STD_MASS:rnd(6,20)});
+    }
+  }
+}
+
+function buildRoundSpec(round){
+  const weighted = round >= 4;
+  const count = Math.min(3 + round, 11);
+  const masses = [];
+  for(let k=0;k<count;k++) masses.push(weighted ? rnd(6,20) : STD_MASS);
+  return {round, weighted, masses};
+}
+
+function loadRound(spec, {announceNew}={announceNew:true}){
+  challenge.round = spec.round;
+  challenge.spec = spec;
+  challenge.active = true;
+  challenge.passed = false;
+  slots = Array(N_SLOTS).fill(null);
+  tray = spec.masses.map(m=>({id:idCounter++, type:'tube', mass:m}));
+  selectedTrayId = null;
+  document.getElementById('cTubeMode').textContent = spec.weighted ? 'Weighted' : 'Strict';
+  document.getElementById('cRound').textContent = spec.round;
+  document.getElementById('btnNewRound').textContent = 'Reset round';
+  document.getElementById('btnNextRound').classList.add('hidden');
+  const cMsg = document.getElementById('cMsg');
+  cMsg.textContent = announceNew ? `Round ${spec.round} — place all tray tubes to balance the rotor.` : 'Round reset.';
+  cMsg.className = 'msg';
+  render();
+}
+
+function startOrResetRound(){
+  if(!challenge.active){
+    loadRound(buildRoundSpec(1));
+  } else {
+    loadRound(challenge.spec, {announceNew:false});
+  }
+}
+
+function advanceRound(){
+  loadRound(buildRoundSpec(challenge.round+1));
+}
+
+function fmtTime(ms){
+  const s = ms/1000;
+  const m = Math.floor(s/60);
+  const rem = (s - m*60).toFixed(1);
+  return `${String(m).padStart(2,'0')}:${rem.padStart(4,'0')}`;
+}
+
+function updateBestDisplay(){
+  document.getElementById('sBest').textContent = speed.best ? fmtTime(speed.best) : '—';
+}
+
+function tickTimer(){
+  speed.elapsedMs = performance.now() - speed.startTs;
+  document.getElementById('sTimer').textContent = fmtTime(speed.elapsedMs);
+}
+
+function startTimer(){
+  speed.startTs = performance.now();
+  speed.elapsedMs = 0;
+  if(speed.timerHandle) clearInterval(speed.timerHandle);
+  speed.timerHandle = setInterval(tickTimer, 100);
+}
+
+function stopTimer(){
+  if(speed.timerHandle){ clearInterval(speed.timerHandle); speed.timerHandle=null; }
+}
+
+function buildSpeedSpec(round){
+  const count = rnd(4,10); // always identical mass — speed/consistency drill
+  const masses = Array(count).fill(STD_MASS);
+  return {round, masses};
+}
+
+function loadSpeedRound(spec, announceNew){
+  speed.round = spec.round;
+  speed.spec = spec;
+  speed.active = true;
+  speed.passed = false;
+  slots = Array(N_SLOTS).fill(null);
+  tray = spec.masses.map(m=>({id:idCounter++, type:'tube', mass:m}));
+  selectedTrayId = null;
+  document.getElementById('sRound').textContent = spec.round;
+  document.getElementById('btnNewSpeed').textContent = 'Reset round';
+  document.getElementById('btnNextSpeed').classList.add('hidden');
+  const sMsg = document.getElementById('sMsg');
+  sMsg.textContent = announceNew ? `Round ${spec.round} — ${spec.masses.length} identical tubes, clock is running.` : 'Round reset — clock restarted.';
+  sMsg.className = 'msg';
+  updateBestDisplay();
+  startTimer();
+  render();
+}
+
+function startOrResetSpeed(){
+  if(!speed.active){ loadSpeedRound(buildSpeedSpec(1), true); }
+  else { loadSpeedRound(speed.spec, false); }
+}
+
+function advanceSpeedRound(){
+  loadSpeedRound(buildSpeedSpec(speed.round+1), true);
+}
+
+function renderRotor(){
+  const svg = document.getElementById('rotor');
+  let html = '';
+  for(let i=0;i<N_SLOTS;i++){
+    const p = slotPos(i);
+    const occ = slots[i];
+    const labelP = {x: CX + (R+22)*Math.cos(p.angle), y: CY + (R+22)*Math.sin(p.angle)};
+    html += `<circle class="slot" data-slot="${i}" cx="${p.x}" cy="${p.y}" r="${SLOT_R}" style="${occ ? (occ.type==='water'?'fill:var(--water);stroke:var(--water);':'fill:#d9dee3;stroke:#aab3bb;') : ''}"></circle>`;
+    if(occ) html += `<text class="tube-mass" x="${p.x}" y="${p.y+3.5}">${occ.mass}</text>`;
+    html += `<text class="slot-label" x="${labelP.x}" y="${labelP.y+3}" text-anchor="middle">${i+1}</text>`;
+  }
+  html += `<circle cx="${CX}" cy="${CY}" r="6" fill="var(--dim)"></circle>`;
+  svg.innerHTML = html;
+  svg.querySelectorAll('.slot').forEach(el=>{
+    el.addEventListener('click', ()=> onSlotClick(parseInt(el.dataset.slot)));
+  });
+}
+
+function renderTray(){
+  const el = document.getElementById('tray');
+  if(tray.length===0){
+    el.innerHTML = '<span class="empty-note">Tray empty — place remaining tubes or clear the rotor.</span>';
+  } else {
+    el.innerHTML = tray.map(t=>{
+      const cls = t.type==='water' ? 'water' : 'tube';
+      const sel = t.id===selectedTrayId ? ' selected' : '';
+      return `<div class="chip ${cls}${sel}" data-id="${t.id}">${t.mass}</div>`;
+    }).join('');
+    el.querySelectorAll('.chip').forEach(c=>{
+      c.addEventListener('click', ()=>{
+        selectedTrayId = (selectedTrayId===parseInt(c.dataset.id)) ? null : parseInt(c.dataset.id);
+        render();
+      });
+    });
+  }
+  document.getElementById('traySelHint').textContent = selectedTrayId ? '(tap a slot to place)' : '';
+}
+
+function onSlotClick(i){
+  if(slots[i]){
+    // return to tray
+    tray.push({id: idCounter++, type: slots[i].type, mass: slots[i].mass});
+    slots[i] = null;
+  } else if(selectedTrayId){
+    const idx = tray.findIndex(t=>t.id===selectedTrayId);
+    if(idx>-1){
+      const t = tray[idx];
+      slots[i] = {type:t.type, mass:t.mass};
+      tray.splice(idx,1);
+      selectedTrayId = null;
+    }
+  }
+  render();
+}
+
+function computeImbalance(){
+  let vx=0, vy=0, totalMass=0, filled=0;
+  for(let i=0;i<N_SLOTS;i++){
+    if(slots[i]){
+      const p = slotPos(i);
+      const dx = Math.cos(p.angle), dy = Math.sin(p.angle);
+      vx += dx*slots[i].mass; vy += dy*slots[i].mass;
+      totalMass += slots[i].mass; filled++;
+    }
+  }
+  const mag = Math.sqrt(vx*vx+vy*vy);
+  const angleDeg = filled>0 ? ((Math.atan2(vy,vx)*180/Math.PI)+360)%360 : null;
+  return {mag, angleDeg, totalMass, filled};
+}
+
+function renderReadout(){
+  const {mag, angleDeg, totalMass, filled} = computeImbalance();
+  document.getElementById('rFilled').textContent = `${filled} / 24`;
+  document.getElementById('rVec').textContent = mag.toFixed(2) + ' g';
+  document.getElementById('rAngle').textContent = angleDeg===null ? '—' : Math.round(angleDeg)+'°';
+  const statusEl = document.getElementById('rStatus');
+  const threshold = Math.max(0.4, totalMass*0.03);
+  if(filled===0){
+    statusEl.textContent = 'EMPTY ROTOR'; statusEl.className='status unbalanced';
+  } else if(mag <= threshold){
+    statusEl.textContent = 'BALANCED'; statusEl.className='status balanced';
+  } else {
+    statusEl.textContent = 'UNBALANCED'; statusEl.className='status unbalanced';
+  }
+  return {mag, threshold, filled};
+}
+
+function render(){
+  renderRotor();
+  renderTray();
+  renderReadout();
+  document.getElementById('sandboxModeCard').classList.toggle('hidden', mode!=='sandbox');
+  document.getElementById('challengeCard').classList.toggle('hidden', mode!=='challenge');
+  document.getElementById('speedCard').classList.toggle('hidden', mode!=='speed');
+}
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    mode = t.dataset.mode;
+    slots = Array(N_SLOTS).fill(null);
+    selectedTrayId = null;
+    document.getElementById('checkMsg').textContent='';
+    stopTimer();
+    if(mode==='sandbox'){ initTray(); }
+    else if(mode==='challenge') {
+      tray=[]; challenge.active=false; challenge.passed=false; challenge.round=0;
+      document.getElementById('btnNewRound').textContent='Start round';
+      document.getElementById('btnNextRound').classList.add('hidden');
+      document.getElementById('cRound').textContent='—';
+      document.getElementById('cMsg').textContent='Click "Start round" to begin.';
+      document.getElementById('cMsg').className='msg';
+    } else {
+      tray=[]; speed.active=false; speed.passed=false; speed.round=0;
+      document.getElementById('btnNewSpeed').textContent='Start round';
+      document.getElementById('btnNextSpeed').classList.add('hidden');
+      document.getElementById('sRound').textContent='—';
+      document.getElementById('sTimer').textContent='00:00.0';
+      document.getElementById('sMsg').textContent='Click "Start round" to begin. All tubes are identical mass.';
+      document.getElementById('sMsg').className='msg';
+      updateBestDisplay();
+    }
+    render();
+  });
+});
+
+document.querySelectorAll('[data-massmode]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-massmode]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    massMode = b.dataset.massmode;
+    slots = Array(N_SLOTS).fill(null);
+    selectedTrayId = null;
+    initTray();
+    render();
+  });
+});
+
+document.getElementById('btnWater').addEventListener('click', ()=>{
+  tray.push({id: idCounter++, type:'water', mass: STD_MASS});
+  render();
+});
+
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  slots = Array(N_SLOTS).fill(null);
+  selectedTrayId = null;
+  if(mode==='sandbox') initTray();
+  document.getElementById('checkMsg').textContent='';
+  render();
+});
+
+document.getElementById('btnNewRound').addEventListener('click', startOrResetRound);
+document.getElementById('btnNextRound').addEventListener('click', advanceRound);
+document.getElementById('btnNewSpeed').addEventListener('click', startOrResetSpeed);
+document.getElementById('btnNextSpeed').addEventListener('click', advanceSpeedRound);
+
+document.getElementById('btnCheck').addEventListener('click', ()=>{
+  const {mag, threshold, filled} = renderReadout();
+  const msgEl = document.getElementById('checkMsg');
+  if(mode==='challenge' && challenge.active){
+    const cMsg = document.getElementById('cMsg');
+    if(tray.length>0){
+      cMsg.textContent = `Place all tray tubes first (${tray.length} left) — use water tubes to fill odd counts.`;
+      cMsg.className = 'msg err';
+      return;
+    }
+    if(mag<=threshold){
+      challenge.passed = true;
+      cMsg.textContent = `Round ${challenge.round} passed. Balanced within tolerance.`;
+      cMsg.className = 'msg ok';
+      document.getElementById('btnNextRound').classList.remove('hidden');
+    } else {
+      cMsg.textContent = `Not balanced — imbalance ${mag.toFixed(1)}g toward ${Math.round(computeImbalance().angleDeg)}°. Rearrange and check again.`;
+      cMsg.className = 'msg err';
+    }
+  } else if(mode==='speed' && speed.active){
+    const sMsg = document.getElementById('sMsg');
+    if(tray.length>0){
+      sMsg.textContent = `Place all ${tray.length} remaining tube(s) — clock is still running.`;
+      sMsg.className = 'msg err';
+      return;
+    }
+    if(mag<=threshold){
+      stopTimer();
+      speed.passed = true;
+      const finalMs = speed.elapsedMs;
+      let newBest = false;
+      if(!speed.best || finalMs < speed.best){ speed.best = finalMs; newBest = true; try{ localStorage.setItem('rotor-speed-best', String(finalMs)); }catch(e){} }
+      updateBestDisplay();
+      sMsg.textContent = `Balanced in ${fmtTime(finalMs)}${newBest ? ' — new best!' : '.'}`;
+      sMsg.className = 'msg ok';
+      document.getElementById('btnNextSpeed').classList.remove('hidden');
+    } else {
+      sMsg.textContent = `Not balanced yet — imbalance ${mag.toFixed(1)}g. Clock keeps running.`;
+      sMsg.className = 'msg err';
+    }
+  } else {
+    if(filled===0){ msgEl.textContent='Place some tubes first.'; msgEl.className='msg err'; return; }
+    if(mag<=threshold){ msgEl.textContent='Balanced within tolerance.'; msgEl.className='msg ok'; }
+    else { msgEl.textContent=`Unbalanced by ${mag.toFixed(1)}g — see net vector above.`; msgEl.className='msg err'; }
+  }
+});
+
+initTray();
+render();
+</script>
+</body>
+</html>
